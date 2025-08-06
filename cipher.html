@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>ギリシャ文字暗号化・復号ツール</title>
+<style>
+body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+    background: #f8f9fa;
+}
+textarea {
+    width: 100%;
+    height: 100px;
+    margin-bottom: 10px;
+    font-size: 16px;
+}
+button {
+    padding: 8px 16px;
+    margin: 5px;
+    font-size: 16px;
+}
+#output {
+    background: #fff;
+    border: 1px solid #ccc;
+    padding: 10px;
+    min-height: 80px;
+    font-size: 16px;
+    white-space: pre-wrap;
+}
+.footer-btn {
+    display: block;
+    width: fit-content;
+    margin-top: 30px;
+    padding: 8px 16px;
+    background: #007bff;
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+}
+.footer-btn:hover {
+    background: #0056b3;
+}
+</style>
+</head>
+<body>
+
+<h2>ギリシャ文字暗号化・復号ツール</h2>
+
+<textarea id="inputText" placeholder="ここに文字を入力"></textarea><br>
+<button onclick="encryptText()">暗号化</button>
+<button onclick="decryptText()">復号</button>
+<button onclick="clearText()">クリア</button>
+
+<h3>結果</h3>
+<div id="output"></div>
+<button onclick="copyResult()">コピー</button>
+
+<a href="https://otsuru2355.github.io/ang0u-fukugou-tool/" class="footer-btn">前回の暗号機</a>
+
+<script>
+// 使用文字セット
+const greekCategory = { 'ひらがな': 'α', 'カタカナ': 'β', 'アルファベット': 'γ', '記号': 'δ', 'ギリシャ': 'ε' };
+const greekTypeKana = { '清音': 'ζ', '濁音': 'η', '半濁音': 'θ' };
+const greekTypeOther = { '大文字全角': 'ζ', '小文字半角': 'η' };
+const codeChars = ['ι','κ','λ','μ','ν','ξ','ο','π','ρ','σ','τ','υ','φ','χ','ψ','ω'];
+
+// マッピング
+let mapping = {};
+let reverseMapping = {};
+let counter = 0;
+
+// 文字リスト
+const hira = "あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんがぎぐげござじずぜぞだぢづでどばびぶべぼぱぴぷぺぽ";
+const kana = "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンガギグゲゴザジズゼゾダヂヅデドバビブベボパピプペポ";
+const alphaUpper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const alphaLower = "abcdefghijklmnopqrstuvwxyz";
+const greekUpper = "ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ";
+const greekLower = "αβγδεζηθικλμνξοπρστυφχψω";
+const symbols = ` !"#$%&'()*+,-./:;<=>?@[\\]^_{|}~！？＂＃＄％＆＇（）＊＋，－．／：；＜＝＞？＠［￥］＾＿｛｜｝～、。・「」『』【】〔〕〈〉《》〃々—〜…※　`;
+
+// 個別コード生成
+function generateCode(num) {
+    let chars = [...codeChars];
+    let code = '';
+    for (let i = 0; i < 4; i++) {
+        let idx = num % chars.length;
+        code += chars[idx];
+        chars.splice(idx, 1);
+        num = Math.floor(num / (chars.length+1));
+    }
+    return code;
+}
+
+// マッピング作成
+function addMapping(char, category, type) {
+    mapping[char] = greekCategory[category] + type + generateCode(counter++);
+    reverseMapping[mapping[char]] = char;
+}
+
+// ひらがな
+for (let i = 0; i < hira.length; i++) {
+    let type = '清音';
+    if ('がぎぐげござじずぜぞだぢづでどばびぶべぼ'.includes(hira[i])) type = '濁音';
+    if ('ぱぴぷぺぽ'.includes(hira[i])) type = '半濁音';
+    addMapping(hira[i], 'ひらがな', greekTypeKana[type]);
+}
+
+// カタカナ
+for (let i = 0; i < kana.length; i++) {
+    let type = '清音';
+    if ('ガギグゲゴザジズゼゾダヂヅデドバビブベボ'.includes(kana[i])) type = '濁音';
+    if ('パピプペポ'.includes(kana[i])) type = '半濁音';
+    addMapping(kana[i], 'カタカナ', greekTypeKana[type]);
+}
+
+// アルファベット
+for (let i = 0; i < alphaUpper.length; i++) {
+    addMapping(alphaUpper[i], 'アルファベット', greekTypeOther['大文字全角']);
+}
+for (let i = 0; i < alphaLower.length; i++) {
+    addMapping(alphaLower[i], 'アルファベット', greekTypeOther['小文字半角']);
+}
+
+// 記号
+for (let i = 0; i < symbols.length; i++) {
+    let s = symbols[i];
+    let type = (s.match(/[！-～]/) || s.match(/[Ａ-Ｚａ-ｚ０-９]/)) ? '大文字全角' : '小文字半角';
+    addMapping(s, '記号', greekTypeOther[type]);
+}
+
+// ギリシャ文字
+for (let i = 0; i < greekUpper.length; i++) {
+    addMapping(greekUpper[i], 'ギリシャ', greekTypeOther['大文字全角']);
+}
+for (let i = 0; i < greekLower.length; i++) {
+    addMapping(greekLower[i], 'ギリシャ', greekTypeOther['小文字半角']);
+}
+
+// 暗号化
+function encryptText() {
+    const input = document.getElementById('inputText').value;
+    let result = [];
+    for (let ch of input) {
+        if (mapping[ch]) {
+            result.push(mapping[ch]);
+        } else {
+            result.push(ch);
+        }
+    }
+    document.getElementById('output').textContent = result.join(' ');
+}
+
+// 復号
+function decryptText() {
+    const input = document.getElementById('inputText').value.trim().split(/\s+/);
+    let result = '';
+    for (let code of input) {
+        if (reverseMapping[code]) {
+            result += reverseMapping[code];
+        } else {
+            result += code;
+        }
+    }
+    document.getElementById('output').textContent = result;
+}
+
+// コピー
+function copyResult() {
+    const text = document.getElementById('output').textContent;
+    if (!text) {
+        alert("コピーする内容がありません。");
+        return;
+    }
+    navigator.clipboard.writeText(text).then(() => {
+        alert("コピーしました！");
+    }).catch(err => {
+        alert("コピーに失敗しました: " + err);
+    });
+}
+
+// クリア
+function clearText() {
+    document.getElementById('inputText').value = '';
+    document.getElementById('output').textContent = '';
+}
+</script>
+
+</body>
+</html>
