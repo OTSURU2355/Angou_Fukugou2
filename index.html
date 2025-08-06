@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>ギリシャ文字暗号化・復号ツール</title>
+<title>ギリシャ文字暗号化・復号ツール（新仕様）</title>
 <style>
 body {
     font-family: Arial, sans-serif;
@@ -45,7 +45,7 @@ button {
 </head>
 <body>
 
-<h2>ギリシャ文字暗号化・復号ツール</h2>
+<h2>ギリシャ文字暗号化・復号ツール（新仕様）</h2>
 
 <textarea id="inputText" placeholder="ここに文字を入力"></textarea><br>
 <button onclick="encryptText()">暗号化</button>
@@ -59,27 +59,57 @@ button {
 <a href="https://otsuru2355.github.io/ang0u-fukugou-tool/" class="footer-btn">前回の暗号機</a>
 
 <script>
-// 使用文字セット
-const greekCategory = { 'ひらがな': 'α', 'カタカナ': 'β', 'アルファベット': 'γ', '記号': 'δ', 'ギリシャ': 'ε' };
-const greekTypeKana = { '清音': 'ζ', '濁音': 'η', '半濁音': 'θ' };
-const greekTypeOther = { '大文字全角': 'ζ', '小文字半角': 'η' };
-const codeChars = ['ι','κ','λ','μ','ν','ξ','ο','π','ρ','σ','τ','υ','φ','χ','ψ','ω'];
+// === カテゴリ用ギリシャ文字 ===
+const catMark = {
+    hira: 'α', // ひらがな
+    kana: 'β', // カタカナ
+    alpha: 'γ', // アルファベット
+    symbol: 'δ', // 記号
+    greek: 'ε', // ギリシャ文字
+    num: 'ζ' // 数字
+};
 
-// マッピング
-let mapping = {};
-let reverseMapping = {};
-let counter = 0;
+// 2文字目（大小）
+const sizeMark = {
+    small: 'η', // 小文字
+    large: 'θ'  // 大文字
+};
 
-// 文字リスト
-const hira = "あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんがぎぐげござじずぜぞだぢづでどばびぶべぼぱぴぷぺぽ";
-const kana = "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンガギグゲゴザジズゼゾダヂヅデドバビブベボパピプペポ";
+// 3文字目（全角半角）
+const widthMark = {
+    half: 'ι',
+    full: 'κ'
+};
+
+// 4文字目（清音/濁音/半濁音）
+const soundMark = {
+    clear: 'λ',
+    voiced: 'μ',
+    semi: 'ν'
+};
+
+// 5〜8文字目（個別コード文字）
+const codeChars = ['ξ','ο','π','ρ','σ','τ','υ','φ','χ','ψ','ω'];
+
+// 文字分類用データ
+const hira = "ぁあぃいぅうぇえぉおかがきぎくぐけげこごさざしじすずせぜそぞただちぢつづてでとどなにぬねのはばぱひびぴふぶぷへべぺほぼぽまみむめもゃやゅゆょよらりるれろゎわゐゑをん";
+const kana = "ァアィイゥウェエォオカガキギクグケゲコゴサザシジスズセゼソゾタダチヂツヅテデトドナニヌネノハバパヒビピフブプヘベペホボポマミムメモャヤュユョヨラリルレロヮワヰヱヲンヴ";
 const alphaUpper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const alphaLower = "abcdefghijklmnopqrstuvwxyz";
 const greekUpper = "ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ";
 const greekLower = "αβγδεζηθικλμνξοπρστυφχψω";
-const symbols = ` !"#$%&'()*+,-./:;<=>?@[\\]^_{|}~！？＂＃＄％＆＇（）＊＋，－．／：；＜＝＞？＠［￥］＾＿｛｜｝～、。・「」『』【】〔〕〈〉《》〃々—〜…※　`;
+const numbers = "0123456789０１２３４５６７８９";
 
-// 個別コード生成
+// 記号カテゴリ（全角半角両方）
+const symbols = `!"#$%&'()*+,-./:;<=>?@[\\]^_{|}~！＂＃＄％＆＇（）＊＋，－．／：；＜＝＞？＠［￥］］＾＿｛｜｝～
+ー、。/\\／＼〜＝=＋+-×✕÷＊*,._＿^:;：；#"'”’＃・･…「」『』【】〔〕〈〉《》〃々—〜…※`;
+
+// 固定変換表
+let mapping = {};
+let reverseMapping = {};
+let counter = 0;
+
+// 個別コード生成（5〜8文字目）
 function generateCode(num) {
     let chars = [...codeChars];
     let code = '';
@@ -87,55 +117,54 @@ function generateCode(num) {
         let idx = num % chars.length;
         code += chars[idx];
         chars.splice(idx, 1);
-        num = Math.floor(num / (chars.length+1));
+        num = Math.floor(num / (chars.length + 1));
     }
     return code;
 }
 
-// マッピング作成
-function addMapping(char, category, type) {
-    mapping[char] = greekCategory[category] + type + generateCode(counter++);
-    reverseMapping[mapping[char]] = char;
+// マッピング作成関数
+function addMapping(ch, category, size, width, sound) {
+    const code = category + size + width + sound + generateCode(counter++);
+    mapping[ch] = code;
+    reverseMapping[code] = ch;
 }
 
-// ひらがな
-for (let i = 0; i < hira.length; i++) {
-    let type = '清音';
-    if ('がぎぐげござじずぜぞだぢづでどばびぶべぼ'.includes(hira[i])) type = '濁音';
-    if ('ぱぴぷぺぽ'.includes(hira[i])) type = '半濁音';
-    addMapping(hira[i], 'ひらがな', greekTypeKana[type]);
+// 文字判定 & マッピング作成
+function buildMappings() {
+    const allChars = hira + kana + alphaUpper + alphaLower + greekUpper + greekLower + numbers + symbols;
+    for (let ch of allChars) {
+        let category, size, width, sound;
+
+        // カテゴリ判定
+        if (hira.includes(ch)) category = catMark.hira;
+        else if (kana.includes(ch)) category = catMark.kana;
+        else if (alphaUpper.includes(ch) || alphaLower.includes(ch)) category = catMark.alpha;
+        else if (greekUpper.includes(ch) || greekLower.includes(ch)) category = catMark.greek;
+        else if (numbers.includes(ch)) category = catMark.num;
+        else if (symbols.includes(ch)) category = catMark.symbol;
+        else continue;
+
+        // 大小判定
+        if (alphaLower.includes(ch) || greekLower.includes(ch) ||
+            "ぁぃぅぇぉゃゅょゎァィゥェォャュョヮ".includes(ch)) {
+            size = sizeMark.small;
+        } else {
+            size = sizeMark.large;
+        }
+
+        // 全角半角判定
+        width = (ch.match(/[ -~]/)) ? widthMark.half : widthMark.full;
+
+        // 音判定（ひらがな・カタカナのみ）
+        if ("がぎぐげござじずぜぞだぢづでどばびぶべぼ".includes(ch)) sound = soundMark.voiced;
+        else if ("ぱぴぷぺぽ".includes(ch)) sound = soundMark.semi;
+        else sound = soundMark.clear;
+
+        addMapping(ch, category, size, width, sound);
+    }
 }
 
-// カタカナ
-for (let i = 0; i < kana.length; i++) {
-    let type = '清音';
-    if ('ガギグゲゴザジズゼゾダヂヅデドバビブベボ'.includes(kana[i])) type = '濁音';
-    if ('パピプペポ'.includes(kana[i])) type = '半濁音';
-    addMapping(kana[i], 'カタカナ', greekTypeKana[type]);
-}
-
-// アルファベット
-for (let i = 0; i < alphaUpper.length; i++) {
-    addMapping(alphaUpper[i], 'アルファベット', greekTypeOther['大文字全角']);
-}
-for (let i = 0; i < alphaLower.length; i++) {
-    addMapping(alphaLower[i], 'アルファベット', greekTypeOther['小文字半角']);
-}
-
-// 記号
-for (let i = 0; i < symbols.length; i++) {
-    let s = symbols[i];
-    let type = (s.match(/[！-～]/) || s.match(/[Ａ-Ｚａ-ｚ０-９]/)) ? '大文字全角' : '小文字半角';
-    addMapping(s, '記号', greekTypeOther[type]);
-}
-
-// ギリシャ文字
-for (let i = 0; i < greekUpper.length; i++) {
-    addMapping(greekUpper[i], 'ギリシャ', greekTypeOther['大文字全角']);
-}
-for (let i = 0; i < greekLower.length; i++) {
-    addMapping(greekLower[i], 'ギリシャ', greekTypeOther['小文字半角']);
-}
+buildMappings();
 
 // 暗号化
 function encryptText() {
