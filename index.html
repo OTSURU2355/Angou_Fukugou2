@@ -133,6 +133,8 @@ function addMapping(ch, category, size, width, sound) {
 function buildMappings() {
     const allChars = hira + kana + alphaUpper + alphaLower + greekUpper + greekLower + numbers + symbols;
     for (let ch of allChars) {
+        if (mapping[ch]) continue; // ★ 上書き防止
+
         let category, size, width, sound;
 
         // カテゴリ判定
